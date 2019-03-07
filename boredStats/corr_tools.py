@@ -54,9 +54,10 @@ class PermutationCorrelation(object):
     """
     Run permutation based inferential testing
     """
-    def __init_(self, n_iters=1000, return_cube=False):
+    def __init_(self, n_iters=1000, fdr=False, return_cube=False):
         self.n_iters = n_iters
         self.cube = return_cube
+        self.fdr = fdr
     
     @staticmethod
     def permutation_p(observed, perm_array, n_iters):
@@ -81,7 +82,13 @@ class PermutationCorrelation(object):
                         corr_matrix[r, c],
                         perm_3dmat[r, c, :],
                         self.n_iters)
+        
+        data = {'r': corr_matrix,
+                'p': p_matrix}
+        if self.fdr:
+            fdr_p = utils.fdr_pmatrix(p_matrix)
+            data['fdr_p'] = fdr_p
         if self.cube:
-            return corr_matrix, p_matrix, perm_3dmat
-        else:
-            return corr_matrix, p_matrix
+            data['permutation_cube'] = perm_3dmat
+        
+        return data

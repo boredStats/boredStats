@@ -5,17 +5,9 @@ Tools for correlation matrices
 Created on Wed Mar  6 14:18:19 2019
 """
 
-import numpy as np
+from boredStats import utils
 
-def center_matrix(a):
-    """
-    Remove the means from each column in a matrix
-    """
-    col_means = a.mean(0)
-    n_rows = a.shape[0]
-    rep_mean = np.reshape(np.repeat(col_means, n_rows), a.shape, order="F")
-    
-    return np.subtract(a, rep_mean)
+import numpy as np
 
 def cross_corr(x, y):
     """
@@ -28,7 +20,7 @@ def cross_corr(x, y):
     std_x = x.std(0, ddof=s - 1)
     std_y = y.std(0, ddof=s - 1)
     
-    cov = np.dot(center_matrix(x).T, center_matrix(y))
+    cov = np.dot(utils.center_matrix(x).T, utils.center_matrix(y))
     
     return cov/np.dot(std_x[:, np.newaxis], std_y[np.newaxis, :])
 
@@ -58,15 +50,6 @@ def r_to_se(rmat, n):
     a = (1 - rmat**2) / (n - 2)
     return np.sqrt(a)
 
-def fdr_p(pmat):
-    """
-    Apply an FDR correction to a matrix of p-values
-    """
-    from statsmodels.stats import multitest as mt
-    pvect = np.ndarray.flatten(pmat)
-    _, fdr_p = mt.fdrcorrection(pvect)
-    return np.reshape(fdr_p, pmat.shape)
-
 class PermutationCorrelation(object):
     """
     Run permutation based inferential testing
@@ -74,15 +57,6 @@ class PermutationCorrelation(object):
     def __init_(self, n_iters=1000, return_cube=False):
         self.n_iters = n_iters
         self.cube = return_cube
-    
-    @staticmethod
-    def column_permutation(matrix):
-        from numpy.random import permutation
-        perm_matrix = np.ndarray(shape=matrix.shape)
-        for col in range(matrix.shape[1]):
-            perm_matrix[:, col] = permutation(matrix[:, col])
-        
-        return perm_matrix
     
     @staticmethod
     def permutation_p(observed, perm_array, n_iters):
@@ -94,8 +68,8 @@ class PermutationCorrelation(object):
         perm_3dmat = np.ndarray(shape=[x.shape[1], y.shape[1], self.n_iters])
         n = 0
         while n != self.n_iters:
-            perm_x = self.column_permutation(x)
-            perm_y = self.column_permutation(y)
+            perm_x = utils.perm_matrix(x)
+            perm_y = utils.perm_matrix(y)
             perm_3dmat[:, :, n] = cross_corr(perm_x, perm_y)
             n += 1
             

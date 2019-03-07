@@ -67,3 +67,43 @@ def fdr_p(pmat):
     _, fdr_p = mt.fdrcorrection(pvect)
     return np.reshape(fdr_p, pmat.shape)
 
+class PermutationCorrelation(object):
+    """
+    Run permutation based inferential testing
+    """
+    def __init_(self, n_iters=1000):
+        self.n_iters = n_iters
+    
+    @staticmethod
+    def column_permutation(matrix):
+        from numpy.random import permutation
+        perm_matrix = np.ndarray(shape=matrix.shape)
+        for col in range(matrix.shape[1]):
+            perm_matrix[:, col] = permutation(matrix[:, col])
+        
+        return perm_matrix
+    
+    @staticmethod
+    def permutation_p(observed, perm_array, n_iters):
+        #see Phipson & Smyth 2010 for more information
+        n_hits = np.where(perm_array >= observed)
+        return (len(n_hits) + 1)/ (n_iters + 1)
+        
+    def perm_corr(self, x, y):
+        perm_3dmat = np.ndarray(shape=[x.shape[1], y.shape[1], self.n_iters])
+        n = 0
+        while n != self.n_iters:
+            perm_x = self.column_permutation(x)
+            perm_y = self.column_permutation(y)
+            perm_3dmat[:, :, n] = cross_corr(perm_x, perm_y)
+            n += 1
+            
+        corr_matrix = cross_corr(x, y)
+        p_matrix = np.ndarray(shape=corr_matrix.shape)
+        for r in range(corr_matrix.shape[0]):
+            for c in range(corr_matrix.shape[1]):
+                obs = corr_matrix[r, c]
+                perm = perm_3dmat[r, c, :]
+                p_matrix[r, c] = self.permutation_p(obs, perm, self.n_iters)
+        
+        return corr_matrix, p_matrix

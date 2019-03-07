@@ -71,8 +71,9 @@ class PermutationCorrelation(object):
     """
     Run permutation based inferential testing
     """
-    def __init_(self, n_iters=1000):
+    def __init_(self, n_iters=1000, return_cube=False):
         self.n_iters = n_iters
+        self.cube = return_cube
     
     @staticmethod
     def column_permutation(matrix):
@@ -102,8 +103,11 @@ class PermutationCorrelation(object):
         p_matrix = np.ndarray(shape=corr_matrix.shape)
         for r in range(corr_matrix.shape[0]):
             for c in range(corr_matrix.shape[1]):
-                obs = corr_matrix[r, c]
-                perm = perm_3dmat[r, c, :]
-                p_matrix[r, c] = self.permutation_p(obs, perm, self.n_iters)
-        
-        return corr_matrix, p_matrix
+                p_matrix[r, c] = self.permutation_p(
+                        corr_matrix[r, c],
+                        perm_3dmat[r, c, :],
+                        self.n_iters)
+        if self.cube:
+            return corr_matrix, p_matrix, perm_3dmat
+        else:
+            return corr_matrix, p_matrix

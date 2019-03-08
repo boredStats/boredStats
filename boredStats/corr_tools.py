@@ -5,7 +5,7 @@ Tools for correlation matrices
 Created on Wed Mar  6 14:18:19 2019
 """
 
-from boredStats import utils
+from . import utils
 
 import numpy as np
 
@@ -58,30 +58,25 @@ class PermutationCorrelation(object):
         self.n_iters = n_iters
         self.cube = return_cube
         self.fdr = fdr
-    
-    @staticmethod
-    def permutation_p(observed, perm_array, n_iters):
-        #see Phipson & Smyth 2010 for more information
-        n_hits = np.where(perm_array >= observed)
-        return (len(n_hits) + 1)/ (n_iters + 1)
         
     def perm_corr(self, x, y):
+        corr_matrix = cross_corr(x, y)
+        
+        p_matrix = np.ndarray(shape=corr_matrix.shape)
         perm_3dmat = np.ndarray(shape=[x.shape[1], y.shape[1], self.n_iters])
+       
         n = 0
         while n != self.n_iters:
             perm_x = utils.perm_matrix(x)
             perm_y = utils.perm_matrix(y)
             perm_3dmat[:, :, n] = cross_corr(perm_x, perm_y)
             n += 1
-            
-        corr_matrix = cross_corr(x, y)
-        p_matrix = np.ndarray(shape=corr_matrix.shape)
+
         for r in range(corr_matrix.shape[0]):
             for c in range(corr_matrix.shape[1]):
-                p_matrix[r, c] = self.permutation_p(
-                        corr_matrix[r, c],
-                        perm_3dmat[r, c, :],
-                        self.n_iters)
+                obs = corr_matrix[r, c]
+                pdist = perm_3dmat[r, c, :]
+                p_matrix[r, c] = self.permutation_p(obs, pdist, self.n_iters)
         
         data = {'r': corr_matrix,
                 'p': p_matrix}

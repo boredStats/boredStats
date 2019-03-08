@@ -48,3 +48,5 @@ class PermutationPCA(object):
         if self.return_perms:
             output['eigen_permutations'] = perm_mat
         return output
+    
+    

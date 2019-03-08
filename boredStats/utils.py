@@ -31,3 +31,8 @@ def fdr_pmatrix(p_matrix):
     pvect = np.ndarray.flatten(p_matrix)
     _, fdr_p = mt.fdrcorrection(pvect)
     return np.reshape(fdr_p, p_matrix.shape)
+
+def permutation_p(observed, perm_array, n_iters):
+    #see Phipson & Smyth 2010 for more information
+    n_hits = np.where(np.abs(perm_array) >= np.abs(observed))
+    return (len(n_hits) + 1)/ (n_iters + 1)

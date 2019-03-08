@@ -76,7 +76,7 @@ class PermutationCorrelation(object):
             for c in range(corr_matrix.shape[1]):
                 obs = corr_matrix[r, c]
                 pdist = perm_3dmat[r, c, :]
-                p_matrix[r, c] = self.permutation_p(obs, pdist, self.n_iters)
+                p_matrix[r, c] = utils.permutation_p(obs, pdist, self.n_iters)
         
         data = {'r': corr_matrix,
                 'p': p_matrix}

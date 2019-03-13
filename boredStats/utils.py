@@ -36,3 +36,18 @@ def permutation_p(observed, perm_array, n_iters):
     #see Phipson & Smyth 2010 for more information
     n_hits = np.where(np.abs(perm_array) >= np.abs(observed))
     return (len(n_hits) + 1)/ (n_iters + 1)
+
+def resample_matrix(matrix):
+    """
+    Columnwise resampling with replacement
+    """        
+    n_rows = matrix.shape[0]
+    n_cols = matrix.shape[1]
+    
+    resamp_mat = np.ndarray(shape=matrix.shape)
+    for col in range(n_cols):
+        for row in range(n_rows):
+            idx = np.random.randint(0, n_rows)
+            resamp_mat[row, col] = matrix[idx, col]
+    
+    return resamp_mat

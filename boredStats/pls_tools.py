@@ -126,7 +126,7 @@ class MultitablePLSC(object):
     @staticmethod
     def mult_plsc(y_table, x_tables):
         """Calculate multitable PLS-C, fixed effect model
-        See Krishnan et al., 2010 for more
+        See Krishnan et al., 2011 for more
         """
         corr_xy = self.build_corr_xy(y_table, x_tables)
         centered_corr_xy = utils.center_matrix(corr_xy)
@@ -154,6 +154,8 @@ class MultitablePLSC(object):
         perm_singular_array : numpy array (optional)
         N x M array of singular values obtained by permuting the
         rows in each table; self.return_perm must be True
+        
+        See Krishnan et al., 2011, 'Deciding which latent variables to keep' 
         """
         if not self.n_iters:
             return AttributeError("Number of permutations cannot be None")
@@ -197,7 +199,7 @@ class MultitablePLSC(object):
         filt_y_sals, filt_x_sals: numpy arrays
         Arrays of saliences filtered by bootstrap testing
         
-        See Krishnan et al. 2011, 'Deciding which latent variables to keep' 
+        See Krishnan et al., 2011, 'Deciding which latent variables to keep' 
         """
         if not self.n_iters:
             raise AttributeError("Number of iterations cannot be None")

@@ -180,7 +180,55 @@ class MultitablePLSC(object):
             return p_values, perm_singular_values
         else:
             return p_values
+    
+    def bootstrap_saliences(self, y_table, x_tables, z_tester=2):
+        """Run bootstrap testing on saliences
+        
+        Parameters:
+        -----------
+        y_taable, x_tables: inputs for multitable PLSC
+        
+        z_tester: int
+        "Z-score" to test bootstrap samples with
+        Default is 2 (or approximately 1.96)
+        
+        Returns:
+        --------
+        filt_y_sals, filt_x_sals: numpy arrays
+        Arrays of saliences filtered by bootstrap testing
+        
+        See Krishnan et al. 2011, 'Deciding which latent variables to keep' 
+        """
+        if not self.n_iters:
+            raise AttributeError("Number of iterations cannot be None")
             
+        orig_svd = self.mult_plsc(y_table, x_tables)
+        orig_y_sals = orig_svd(0)
+        orig_x_sals = orig_svd(2)
+        
+        n = 0
+        perm_y_sals = np.ndarray(shape=[orig_y_sals.shape, self.n_iters])
+        perm_x_sals = np.ndarray(shape=[orig_x_sals.shape, self.n_iters])
+        while n != self.n_iters:
+            resamp_y = utils.resample_matrix(y_table)
+            resamp_x_list = [utils.resample_matrix(x) for x in x_tables]
+            
+            resamp_svd = self.mult_plsc(resamp_y, resamp_x_list)
+            rot_svd = self.procrustes_rotation(orig_svd, resamp_svd)
+            perm_y_sals[:, :, n] = rot_svd(0)
+            perm_x_sals[:, :, n] = rot_svd(2)
+        
+        perm_y_sals_std = np.std(perm_y_sals, axis=-1)
+        perm_x_sals_std = np.std(perm_x_sals, axis=-1)
+        
+        perm_y_zscores = np.divide(orig_y_sals, perm_y_sals_std)
+        perm_x_zscores = np.divide(orig_x_sals, perm_x_sals_std)
+        
+        filt_y_sals = orig_y_sals[perm_y_zscores < 2] = 0
+        filt_x_sals = orig_x_sals[perm_x_zscores < 2] = 0
+        
+        return filt_y_sals, filt_x_sals
+        
 if __name__ == "__main__":
     n = 100
     y = np.random.rand(n, 15)

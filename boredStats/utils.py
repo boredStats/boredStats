@@ -32,10 +32,11 @@ def fdr_pmatrix(p_matrix):
     _, fdr_p = mt.fdrcorrection(pvect)
     return np.reshape(fdr_p, p_matrix.shape)
 
-def permutation_p(observed, perm_array, n_iters):
+def permutation_p(observed, perm_array):
     #see Phipson & Smyth 2010 for more information
+    n_iters = len(perm_array)
     n_hits = np.where(np.abs(perm_array) >= np.abs(observed))
-    return (len(n_hits) + 1)/ (n_iters + 1)
+    return (len(n_hits[0]) + 1) / (n_iters + 1)
 
 def resample_matrix(matrix):
     """

@@ -82,7 +82,7 @@ class MultitablePLSC(object):
         ov = orig_svd(0)
         rv = resamp_svd(0)
         rs = resamp_svd(1)
-        ru = resamm_svd(2)
+        ru = resamp_svd(2)
 
         n, _, p = np.svd(np.matmul(ov.T, rv))
         
@@ -98,30 +98,30 @@ class MultitablePLSC(object):
     
     @staticmethod
     def p_from_perm_mat(obs_vect, perm_array):
-    """Calculate p-values columnwise
-    
-    Parameters:
-    -----------
-    obs_vect : numpy array
-    Vector of true observations
-    
-    perm_array : numpy array
-    N x M array of observations obtained through permutation
-        N is the number of permutations used
-        M is the number of variables
-    
-    Returns:
-    --------
-    p_values : numpy array
-    Vector of p-values corresponding to obs_vect
-    """
+        """Calculate p-values columnwise
 
-    n_iters = perm_array.shape[0]
-    p_values = np.ndarray(shape=obs_vect.shape)
-    for t, true in enumerate(obs_vect):
-        perm_data = perm_array[t, :]
-        p_values[t] = utils.permutation_p(true, perm_data, n_iters)
-    return p_values
+        Parameters:
+        -----------
+        obs_vect : numpy array
+        Vector of true observations
+
+        perm_array : numpy array
+        N x M array of observations obtained through permutation
+            N is the number of permutations used
+            M is the number of variables
+
+        Returns:
+        --------
+        p_values : numpy array
+        Vector of p-values corresponding to obs_vect
+        """
+
+        n_iters = perm_array.shape[0]
+        p_values = np.ndarray(shape=obs_vect.shape)
+        for t, true in enumerate(obs_vect):
+            perm_data = perm_array[t, :]
+            p_values[t] = utils.permutation_p(true, perm_data, n_iters)
+        return p_values
    
     @staticmethod
     def mult_plsc(y_table, x_tables):

@@ -64,7 +64,7 @@ class PermutationCorrelation(object):
         
         p_matrix = np.ndarray(shape=corr_matrix.shape)
         perm_3dmat = np.ndarray(shape=[x.shape[1], y.shape[1], self.n_iters])
-       
+        
         n = 0
         while n != self.n_iters:
             perm_x = utils.perm_matrix(x)

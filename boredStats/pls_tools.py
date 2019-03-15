@@ -1,12 +1,16 @@
-"""Tools for running Partial-Least Squares Correlation
+"""Tools for running Partial-Least Squares Analyses
 
-Complete:
-Multi-table PLSC
-Inference testing for # of latent variables to use
-
-To-do:
-Bootstrap testing for stabililty of saliences
+Finished:
+Multitable PLS-C
+    
+TODO:
+Projecting observations into subspace
+Multtable PLS-R
+Support for pandas
 Test suite
+
+Note: These should be able to handle basic PLS-C/ PLS-R analyses since it only
+requires a list of arrays
 """
 
 import utils
@@ -20,7 +24,7 @@ class MultitablePLSC(object):
         self.return_perm = return_perm
     
     @staticmethod
-    def build_corr_xy(y, x_list):
+    def _build_corr_xy(y, x_list):
         """Build input for multitable PLSC
         Formula is:
             Y = X1 + X2 + ... + Xn
@@ -55,7 +59,7 @@ class MultitablePLSC(object):
         return cross_xy
     
     @staticmethod
-    def procrustes_rotation(orig_svd, resamp_svd):
+    def _procrustes_rotation(orig_svd, resamp_svd):
         """Apply a Procrustes rotation to resampled SVD results
         
         This rotation is to correct for:
@@ -96,7 +100,7 @@ class MultitablePLSC(object):
         return rotated_u, rotated_diag, rotated_v
     
     @staticmethod
-    def p_from_perm_mat(obs_vect, perm_array):
+    def _p_from_perm_mat(obs_vect, perm_array):
         """Calculate p-values columnwise
 
         Parameters:
@@ -120,17 +124,38 @@ class MultitablePLSC(object):
             p_values[t] = utils.permutation_p(true, perm_data)
         return p_values
     
+    @staticmethod
+    def _bootstrap_z(true_observations, permutation_cube, z_test):
+        """Calculate "z-scores" from a cube of permutation data
+        
+        Works in tandem with mult_plsc_boostrap_saliences
+        """
+        standard_dev = np.std(permutation_cube, axis=-1)
+        bootz = np.divide(true_observations, standard_dev)
+        
+        zfilt = np.where(np.abs(bootz) < z_test)
+        
+        #create a copy of data safely using numpy only
+        filtered_observations = np.ndarray(shape=true_observations.shape)
+        filtered_observations[:, :] = true_observations
+        for i in range(len(zfilt[0])):
+            row = zfilt[0][i]
+            col = zfilt[1][i]
+            filtered_observations[row, col] = 0
+        
+        return filtered_observations, bootz
+    
     def mult_plsc(self, y_table, x_tables):
         """Calculate multitable PLS-C, fixed effect model
         See Krishnan et al., 2011 for more
         """
-        corr_xy = self.build_corr_xy(y_table, x_tables)
+        corr_xy = self._build_corr_xy(y_table, x_tables)
         centered_corr_xy = utils.center_matrix(corr_xy)
         
         u, delta, v = np.linalg.svd(centered_corr_xy, full_matrices=False)
         return u, delta, v
 
-    def perm_mult_plsc(self, y_table, x_tables):
+    def mult_plsc_eigenperm(self, y_table, x_tables):
         """Run permutation based testing to determine
         best number of latent variables to use
         
@@ -165,12 +190,12 @@ class MultitablePLSC(object):
             perm_x_tables = [utils.perm_matrix(x) for x in x_tables]
             
             perm_svd = self.mult_plsc(perm_y, perm_x_tables)
-            rot_perm = self.procrustes_rotation(orig_svd, perm_svd)
+            rot_perm = self._procrustes_rotation(orig_svd, perm_svd)
 
             perm_singular_values[n, :] = rot_perm[1]
             n += 1
         
-        p_values = self.p_from_perm_mat(orig_sing, perm_singular_values)
+        p_values = self._p_from_perm_mat(orig_sing, perm_singular_values)
         
         output = {'true_eigenvalues' : orig_sing,
                  'p_values' : p_values}
@@ -179,7 +204,7 @@ class MultitablePLSC(object):
         
         return output
     
-    def bootstrap_saliences(self, y_table, x_tables, z_tester=2):
+    def mult_plsc_bootstrap_saliences(self, y_table, x_tables, z_tester=2):
         """Run bootstrap testing on saliences
         
         Parameters:
@@ -187,54 +212,62 @@ class MultitablePLSC(object):
         y_taable, x_tables: inputs for multitable PLSC
         
         z_tester: int
-        "Z-score" to test bootstrap samples with
-        Default is 2 (or approximately 1.96)
+            "Z-score" to test bootstrap samples with
+            Default is 2 (or approximately 1.96)
         
         Returns:
         --------
-        filt_y_sals, filt_x_sals: numpy arrays
-        Arrays of saliences filtered by bootstrap testing
+        output: dict
+            Dictionary of filtered saliences
+            If return_perm is True, output will include the "z-scores" and
+            permutation cube data for the salience matrices
         
         See Krishnan et al., 2011, 'Deciding which latent variables to keep' 
         """
         if not self.n_iters:
             raise AttributeError("Number of iterations cannot be None")
             
-        orig_svd = self.mult_plsc(y_table, x_tables)
-        orig_y_sals = orig_svd[0]
-        orig_x_sals = orig_svd[2]
+        true_svd = self.mult_plsc(y_table, x_tables)
+        true_ysal = true_svd[0] #saliences for y-table
+        true_xsal = true_svd[2] #saliences for x-tables
         
+        perm_ysal = np.ndarray(shape=[true_ysal.shape[0],
+                                      true_ysal.shape[1],
+                                      self.n_iters])
+        perm_xsal = np.ndarray(shape=[true_xsal.shape[0],
+                                      true_xsal.shape[1],
+                                      self.n_iters])
+    
         n = 0
-        perm_y_sals = np.ndarray(shape=[orig_y_sals.shape, self.n_iters])
-        perm_x_sals = np.ndarray(shape=[orig_x_sals.shape, self.n_iters])
         while n != self.n_iters:
-            resamp_y = utils.resample_matrix(y_table)
-            resamp_x_list = [utils.resample_matrix(x) for x in x_tables]
+            resampled_y = utils.resample_matrix(y_table)
+            resampled_x_tables = [utils.resample_matrix(x) for x in x_tables]
             
-            resamp_svd = self.mult_plsc(resamp_y, resamp_x_list)
-            rot_svd = self.procrustes_rotation(orig_svd, resamp_svd)
-            perm_y_sals[:, :, n] = rot_svd[0]
-            perm_x_sals[:, :, n] = rot_svd[2]
+            resampled_svd = self.mult_plsc(resampled_y, resampled_x_tables)
+            rotated_svd = self._procrustes_rotation(true_svd, resampled_svd)
+            perm_ysal[:, :, n] = rotated_svd[0]
+            perm_xsal[:, :, n] = rotated_svd[2]
+            n += 1
         
-        perm_y_sals_std = np.std(perm_y_sals, axis=-1)
-        perm_x_sals_std = np.std(perm_x_sals, axis=-1)
+        filt_ysal, yz = self._bootstrap_z(true_ysal, perm_ysal, z_tester)
+        filt_xsal, xz = self._bootstrap_z(true_xsal, perm_xsal, z_tester)
         
-        perm_y_zscores = np.divide(orig_y_sals, perm_y_sals_std)
-        perm_x_zscores = np.divide(orig_x_sals, perm_x_sals_std)
+        output = {'y_saliences' : filt_ysal,
+                  'x_saliences' : filt_xsal}
+        if self.return_perm:
+            output['zscores_y_saliences'] = yz
+            output['zscores_x_saliences'] = xz
+            output['permcube_y_saliences'] = perm_ysal
+            output['permcube_x_saliences'] = perm_xsal
         
-        filt_y_sals = orig_y_sals[perm_y_zscores < 2] = 0
-        filt_x_sals = orig_x_sals[perm_x_zscores < 2] = 0
+        return output
         
-        return filt_y_sals, filt_x_sals
         
 if __name__ == "__main__":
-    n = 100
-    y = np.random.rand(n, 15)
+    y_table = np.loadtxt('y_table.txt')
+    x_tables = [np.loadtxt('x_table_%d.txt' % (x+1)) for x in range(3)]
     
-    x_list = []
-    for numx in range(6):
-        x_list.append(np.random.rand(n, 10))
+    p = MultitablePLSC(n_iters=1000)
     
-    p = MultitablePLSC()
-    res = p.mult_plsc(y, x_list)
-    print(res)
+    res_permeigs = p.mult_plsc_eigenperm(y_table, x_tables)
+    res_boostrap = p.mult_plsc_bootstrap_saliences(y_table, x_tables)

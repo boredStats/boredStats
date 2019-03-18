@@ -1,5 +1,21 @@
-# boredStats
+## boredStats
 
-My personal tools for memory friendly statistical testing on matrices to fill in the gaps in scipy.stats, along with permutation-based inferential testing for data mining techniques like PCA and PLS. 
+Tools for data mining and Monte Carlo simulation-based inferential statistics. 
 
-_Because for loops are for chumps._
+Pandas dataframes are currently not supported.
+
+### _Requirements_
+- numpy
+- matplotlib (for making scree plots, will likely remove)
+
+Implemented:
+- Multi-table PLS-correlation
+
+In progress:
+- PCA - permutation testing for eigenvalues, bootstrap testing for loadings
+
+Planned:
+- Multi-table PLS-regression
+- Correspondence Analysis/Multiple Correspondence Analysis + inferential stats
+- Support for pandas
+- pypi distribution

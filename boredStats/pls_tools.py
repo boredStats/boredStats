@@ -13,8 +13,8 @@ Note: These should be able to handle basic PLS-C/ PLS-R analyses since it only
 requires a list of arrays
 """
 
-import utils
-from corr_tools import cross_corr
+from . import utils
+from .corr_tools import cross_corr
 
 import numpy as np
 
@@ -83,19 +83,42 @@ class MultitablePLSC(object):
         rotated_v : rotated right singular values
         """
         
-        original_v = orig_svd[2]
+#        original_v = orig_svd[2]
+#        perm_u = resamp_svd[0]
+#        perm_diag = resamp_svd[1]
+#        perm_v = resamp_svd[2]
+#
+#        n, _, p = np.linalg.svd(np.dot(original_v.T, perm_v), full_matrices=False)
+#        rotation_matrix = np.dot(n, p.T)
+#        
+#        rotated_u = np.dot(np.dot(perm_u, np.diagflat(perm_diag)), rotation_matrix)
+#        rotated_v = np.dot(rotation_matrix, np.dot(np.diagflat(perm_diag), perm_v))
+#        
+#        sum_of_squares_rotated_u = np.sum(rotated_v[:, :]**2, 0)
+#        rotated_diag = np.sqrt(sum_of_squares_rotated_u)
+        
+        original_u = orig_svd[0]
         perm_u = resamp_svd[0]
-        perm_diag = resamp_svd[1]
         perm_v = resamp_svd[2]
-
-        n, _, p = np.linalg.svd(np.dot(original_v.T, perm_v), full_matrices=False)
-        rotation_matrix = n.dot(p.T)
+        perm_diag = resamp_svd[1]
         
-        rotated_u = np.dot(np.dot(perm_u, np.diagflat(perm_diag)), rotation_matrix)
-        rotated_v = np.dot(rotation_matrix, np.dot(np.diagflat(perm_diag), perm_v))
         
-        sum_of_squares_rotated_u = np.sum(rotated_v[:, :]**2, 0)
-        rotated_diag = np.sqrt(sum_of_squares_rotated_u)
+        n, _, p = np.linalg.svd(np.dot(original_u.T, perm_u),
+                                full_matrices=False)
+        rotation_matrix = np.dot(n, p.T)
+        
+        rotated_u = np.dot(np.dot(perm_u, np.diagflat(perm_diag)),
+                           rotation_matrix)
+        
+        rotated_v = np.dot(rotation_matrix,
+                           np.dot(np.diagflat(perm_diag), perm_v))
+        
+        try:
+            sum_of_squares_rotated_u = np.sum(rotated_v[:, :]**2, 1)
+            rotated_diag = np.sqrt(sum_of_squares_rotated_u)
+        except RuntimeWarning as err:
+            if 'overflow' in err:
+                raise OverflowError
         
         return rotated_u, rotated_diag, rotated_v
     
@@ -131,7 +154,8 @@ class MultitablePLSC(object):
         Works in tandem with mult_plsc_boostrap_saliences
         """
         standard_dev = np.std(permutation_cube, axis=-1)
-        bootz = np.divide(true_observations, standard_dev)
+        standard_err = standard_dev / np.sqrt(permutation_cube.shape[2])
+        bootz = np.divide(true_observations, standard_err)
         
         zfilt = np.where(np.abs(bootz) < z_test)
         
@@ -145,11 +169,24 @@ class MultitablePLSC(object):
         
         return filtered_observations, bootz
     
-    def mult_plsc(self, y_table, x_tables):
+    def mult_plsc(self, y_table=None, x_tables=None, corr_xy=None):
         """Calculate multitable PLS-C, fixed effect model
+        
+        Parameters
+        ----------
+        y_table: numpy array
+        
+        x_tables: list
+            List of numpy arrays 
+        
+        corr_xy: numpy array
+            Pre-calculated cross-correlation matrix
+        
         See Krishnan et al., 2011 for more
         """
-        corr_xy = self._build_corr_xy(y_table, x_tables)
+        if corr_xy is None:
+            corr_xy = self._build_corr_xy(y_table, x_tables)
+        
         centered_corr_xy = utils.center_matrix(corr_xy)
         
         u, delta, v = np.linalg.svd(centered_corr_xy, full_matrices=False)
@@ -185,20 +222,27 @@ class MultitablePLSC(object):
         n = 0
         perm_singular_values = np.ndarray(shape=[self.n_iters, len(orig_sing)])
         while n != self.n_iters:
-            #print('Working on iteration %d out of %d' % (int(n+1), self.n_iters))
-            perm_y = utils.perm_matrix(y_table)
-            perm_x_tables = [utils.perm_matrix(x) for x in x_tables]
-            
-            perm_svd = self.mult_plsc(perm_y, perm_x_tables)
-            rot_perm = self._procrustes_rotation(orig_svd, perm_svd)
-
+            try:
+                perm_y = utils.perm_matrix(y_table)
+                perm_x_tables = [utils.perm_matrix(x) for x in x_tables]
+                
+                perm_svd = self.mult_plsc(perm_y, perm_x_tables)
+            except np.linalg.LinAlgError:
+                continue 
+           
+            try:
+                rot_perm = self._procrustes_rotation(orig_svd, perm_svd)
+            except OverflowError:
+                continue
+                
             perm_singular_values[n, :] = rot_perm[1]
             n += 1
-        
+            
         p_values = self._p_from_perm_mat(orig_sing, perm_singular_values)
         
-        output = {'true_eigenvalues' : orig_sing,
-                 'p_values' : p_values}
+        output = {'svd_res' : orig_svd,
+                  'true_eigenvalues' : orig_sing,
+                  'p_values' : p_values}
         if self.return_perm:
             output['permutation_eigs'] = perm_singular_values
         
@@ -226,7 +270,7 @@ class MultitablePLSC(object):
         """
         if not self.n_iters:
             raise AttributeError("Number of iterations cannot be None")
-            
+        
         true_svd = self.mult_plsc(y_table, x_tables)
         true_ysal = true_svd[0] #saliences for y-table
         true_xsal = true_svd[2] #saliences for x-tables
@@ -240,15 +284,24 @@ class MultitablePLSC(object):
     
         n = 0
         while n != self.n_iters:
-            resampled_y = utils.resample_matrix(y_table)
-            resampled_x_tables = [utils.resample_matrix(x) for x in x_tables]
-            
-            resampled_svd = self.mult_plsc(resampled_y, resampled_x_tables)
-            rotated_svd = self._procrustes_rotation(true_svd, resampled_svd)
+            try:
+                resampled_y = utils.resample_matrix(y_table)
+                resampled_x_tables = [utils.resample_matrix(x) for x in x_tables]
+                
+                resampled_svd = self.mult_plsc(resampled_y, resampled_x_tables)
+            except np.linalg.LinAlgError:
+                continue
+        
+            try:
+                rotated_svd = self._procrustes_rotation(true_svd,
+                                                        resampled_svd)
+            except OverflowError:
+                continue
+                
             perm_ysal[:, :, n] = rotated_svd[0]
             perm_xsal[:, :, n] = rotated_svd[2]
             n += 1
-        
+            
         filt_ysal, yz = self._bootstrap_z(true_ysal, perm_ysal, z_tester)
         filt_xsal, xz = self._bootstrap_z(true_xsal, perm_xsal, z_tester)
         
@@ -261,7 +314,6 @@ class MultitablePLSC(object):
             output['permcube_x_saliences'] = perm_xsal
         
         return output
-        
         
 if __name__ == "__main__":
     y_table = np.loadtxt('y_table.txt')

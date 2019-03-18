@@ -5,7 +5,7 @@ Tools for correlation matrices
 Created on Wed Mar  6 14:18:19 2019
 """
 
-import utils
+from . import utils
 
 import numpy as np
 

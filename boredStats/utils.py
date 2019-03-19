@@ -6,8 +6,6 @@ Created on Thu Mar  7 10:37:27 2019
 """
 
 import numpy as np
-import matplotlib as mpl
-import matplotlib.pyplot as plt
 from numpy.random import permutation as pf
 #from statsmodels.stats import multitest as mt
 

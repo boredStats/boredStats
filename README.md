@@ -6,7 +6,6 @@ Pandas dataframes are currently not supported.
 
 ### _Requirements_
 - numpy
-- matplotlib (for making scree plots, will likely remove)
 
 Implemented:
 - Multi-table PLS-correlation

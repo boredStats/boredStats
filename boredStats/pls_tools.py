@@ -48,13 +48,14 @@ class MultitablePLSC(object):
         num_vars_in_y = y.shape[1]
         num_vars_in_x = [x.shape[1] for x in x_list]
         
-        cross_xy = np.ndarray(shape=[num_vars_in_y, sum(num_vars_in_x)])
+        cross_xy = np.ndarray(shape=[sum(num_vars_in_x), num_vars_in_y])
         
         start_index = 0
         for x_index, x_table in enumerate(x_list):
-            cross_corrmat = cross_corr(y, x_table)
+            cross_corrmat = cross_corr(x_table, y)
             end_index = start_index + num_vars_in_x[x_index]
-            cross_xy[:, start_index:end_index] = cross_corrmat
+            cross_xy[start_index:end_index, :] = cross_corrmat
+            start_index = start_index + num_vars_in_x[x_index]
             
         return cross_xy
     
@@ -272,8 +273,8 @@ class MultitablePLSC(object):
             raise AttributeError("Number of iterations cannot be None")
         
         true_svd = self.mult_plsc(y_table, x_tables)
-        true_ysal = true_svd[0] #saliences for y-table
-        true_xsal = true_svd[2] #saliences for x-tables
+        true_ysal = true_svd[2] #saliences for y-table
+        true_xsal = true_svd[0] #saliences for x-tables
         
         perm_ysal = np.ndarray(shape=[true_ysal.shape[0],
                                       true_ysal.shape[1],
@@ -298,8 +299,8 @@ class MultitablePLSC(object):
             except OverflowError:
                 continue
                 
-            perm_ysal[:, :, n] = rotated_svd[0]
-            perm_xsal[:, :, n] = rotated_svd[2]
+            perm_ysal[:, :, n] = rotated_svd[2]
+            perm_xsal[:, :, n] = rotated_svd[0]
             n += 1
             
         filt_ysal, yz = self._bootstrap_z(true_ysal, perm_ysal, z_tester)

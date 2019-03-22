@@ -48,6 +48,10 @@ class MultitablePLSC(object):
         num_vars_in_y = y.shape[1]
         num_vars_in_x = [x.shape[1] for x in x_list]
         
+        for x in x_list:
+            if y.shape[0] != x.shape[0]:
+                raise RuntimeError("Tables must have same number of subjects")
+        
         cross_xy = np.ndarray(shape=[sum(num_vars_in_x), num_vars_in_y])
         
         start_index = 0
@@ -103,9 +107,9 @@ class MultitablePLSC(object):
         perm_v = resamp_svd[2]
         perm_diag = resamp_svd[1]
         
-        
         n, _, p = np.linalg.svd(np.dot(original_u.T, perm_u),
                                 full_matrices=False)
+        
         rotation_matrix = np.dot(n, p.T)
         
         rotated_u = np.dot(np.dot(perm_u, np.diagflat(perm_diag)),
@@ -119,7 +123,7 @@ class MultitablePLSC(object):
             rotated_diag = np.sqrt(sum_of_squares_rotated_u)
         except RuntimeWarning as err:
             if 'overflow' in err:
-                raise OverflowError
+                raise OverflowError #catch overflow to rerun permutation
         
         return rotated_u, rotated_diag, rotated_v
     
@@ -229,12 +233,12 @@ class MultitablePLSC(object):
                 
                 perm_svd = self.mult_plsc(perm_y, perm_x_tables)
             except np.linalg.LinAlgError:
-                continue 
+                continue #Rerun permutation if SVD doesn't converge
            
             try:
                 rot_perm = self._procrustes_rotation(orig_svd, perm_svd)
             except OverflowError:
-                continue
+                continue #Rerun permutation if overflow
                 
             perm_singular_values[n, :] = rot_perm[1]
             n += 1
@@ -291,13 +295,13 @@ class MultitablePLSC(object):
                 
                 resampled_svd = self.mult_plsc(resampled_y, resampled_x_tables)
             except np.linalg.LinAlgError:
-                continue
+                continue #Rerun permutation if SVD doesn't converge
         
             try:
                 rotated_svd = self._procrustes_rotation(true_svd,
                                                         resampled_svd)
             except OverflowError:
-                continue
+                continue #Rerun permutation if overflow
                 
             perm_ysal[:, :, n] = rotated_svd[2]
             perm_xsal[:, :, n] = rotated_svd[0]

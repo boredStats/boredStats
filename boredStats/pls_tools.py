@@ -17,6 +17,7 @@ from . import utils
 from .corr_tools import cross_corr
 
 import numpy as np
+import pandas as pd
 
 class MultitablePLSC(object):
     def __init__(self, n_iters=None, return_perm=False):
@@ -24,45 +25,22 @@ class MultitablePLSC(object):
         self.return_perm = return_perm
 
     @staticmethod
-    def _build_corr_xy(y, x_list):
-        """Build input for multitable PLSC
-        Formula is:
-            Y = X1 + X2 + ... + Xn
-
-            Where Y is a table of outcome variables and
-            Xn are N tables of vars to correlate with Y
-
-        Parameters:
-        -----------
-        y : numpy array
-
-        x_list : list
-            A list of numpy arrays
-
-        Notes:
-        ------
-        The arrays in y and x_list must have the same
-        number of rows
-        """
-
-        num_vars_in_y = y.shape[1]
-        num_vars_in_x = [x.shape[1] for x in x_list]
-
-        for x in x_list:
-            if y.shape[0] != x.shape[0]:
-                raise RuntimeError("Tables must have same number of subjects")
-
-        cross_xy = np.ndarray(shape=[sum(num_vars_in_x), num_vars_in_y])
-
-        start_index = 0
-        for x_index, x_table in enumerate(x_list):
-            cross_corrmat = cross_corr(x_table, y)
-            end_index = start_index + num_vars_in_x[x_index]
-            cross_xy[start_index:end_index, :] = cross_corrmat
-            start_index = start_index + num_vars_in_x[x_index]
-
-        return cross_xy
-
+    def _clean_tables(table):
+        #Check input type, return as list of numpy arrays
+        outlist = []
+        if isinstance(table, list):
+            for t in table:
+                if isinstance(t, np.ndarray):
+                    outlist.append(t)
+                elif isinstance(t, pd.DataFrame):
+                    outlist.append(t.values)
+                else:
+                    return ValueError("Input was not an array or dataframe")
+        if isinstance(table, np.ndarraay):
+            outlist.append(table)
+        if isinstance(table, pd.DataFrame):
+            outlist.append(table.values)
+    
     @staticmethod
     def _procrustes_rotation(orig_svd, resamp_svd):
         """Apply a Procrustes rotation to resampled SVD results
@@ -174,24 +152,30 @@ class MultitablePLSC(object):
 
         return filtered_observations, bootz
 
-    def mult_plsc(self, y_table=None, x_tables=None, corr_xy=None):
+    def mult_plsc(self, y_tables=None, x_tables=None, corr_xy=None):
         """Calculate multitable PLS-C, fixed effect model
 
         Parameters
         ----------
-        y_table: numpy array
+        y_tables: numpy array, pandas dataframe, or list either
 
-        x_tables: list
-            List of numpy arrays
+        x_tables:  numpy array, pandas dataframe, or list either
 
         corr_xy: numpy array
             Pre-calculated cross-correlation matrix
 
         See Krishnan et al., 2011 for more
         """
+        for y in y_tables:
+            for x in x_tables:
+                if y.shape[0] != x.shape[0]:
+                    raise RuntimeError("Tables need same number of subjects")
+        
         if corr_xy is None:
-            corr_xy = self._build_corr_xy(y_table, x_tables)
-
+             x = self._clean_tables(x_tables)
+             y = self._clean_tables(y_tables)
+             corr_xy = cross_corr(np.hstacK(x), np.hstack(y))
+        
         centered_corr_xy = utils.center_matrix(corr_xy)
 
         u, delta, v = np.linalg.svd(centered_corr_xy, full_matrices=False)
@@ -322,10 +306,10 @@ class MultitablePLSC(object):
 
 if __name__ == "__main__":
     print('Test')
-    y_table = np.loadtxt('y_table.txt')
-    x_tables = [np.loadtxt('x_table_%d.txt' % (x+1)) for x in range(3)]
+    y = np.loadtxt('y_table.txt')
+    x_list = [np.loadtxt('x_table_%d.txt' % (x+1)) for x in range(3)]
 
     p = MultitablePLSC(n_iters=1000)
 
-    res_permeigs = p.mult_plsc_eigenperm(y_table, x_tables)
-    res_boostrap = p.mult_plsc_bootstrap_saliences(y_table, x_tables)
+    res_permeigs = p.mult_plsc_eigenperm(y, x_list)
+    res_boostrap = p.mult_plsc_bootstrap_saliences(y, x_list)

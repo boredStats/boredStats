@@ -36,10 +36,13 @@ class MultitablePLSC(object):
                     outlist.append(t.values)
                 else:
                     return ValueError("Input was not an array or dataframe")
-        if isinstance(table, np.ndarraay):
+                
+        if isinstance(table, np.ndarray):
             outlist.append(table)
         if isinstance(table, pd.DataFrame):
             outlist.append(table.values)
+        
+        return outlist
     
     @staticmethod
     def _procrustes_rotation(orig_svd, resamp_svd):
@@ -166,22 +169,23 @@ class MultitablePLSC(object):
 
         See Krishnan et al., 2011 for more
         """
-        for y in y_tables:
-            for x in x_tables:
-                if y.shape[0] != x.shape[0]:
-                    raise RuntimeError("Tables need same number of subjects")
         
         if corr_xy is None:
-             x = self._clean_tables(x_tables)
-             y = self._clean_tables(y_tables)
-             corr_xy = cross_corr(np.hstacK(x), np.hstack(y))
+            x = self._clean_tables(x_tables)
+            y = self._clean_tables(y_tables)
+            for yt in y:
+                for xt in x:
+                    if yt.shape[0] != xt.shape[0]:
+                        raise RuntimeError("Tables need same number of subjects")
+            
+            corr_xy = cross_corr(np.hstack(x), np.hstack(y))
         
         centered_corr_xy = utils.center_matrix(corr_xy)
 
         u, delta, v = np.linalg.svd(centered_corr_xy, full_matrices=False)
         return u, delta, v
 
-    def mult_plsc_eigenperm(self, y_table, x_tables):
+    def mult_plsc_eigenperm(self, y_tables, x_tables):
         """Run permutation based testing to determine
         best number of latent variables to use
 
@@ -205,17 +209,19 @@ class MultitablePLSC(object):
         if not self.n_iters:
             return AttributeError("Number of permutations cannot be None")
 
-        orig_svd = self.mult_plsc(y_table, x_tables)
+        orig_svd = self.mult_plsc(y_tables, x_tables)
         orig_sing = orig_svd[1]
 
         n = 0
         perm_singular_values = np.ndarray(shape=[self.n_iters, len(orig_sing)])
         while n != self.n_iters:
             try:
-                perm_y = utils.perm_matrix(y_table)
-                perm_x_tables = [utils.perm_matrix(x) for x in x_tables]
+                y_cleaned = self._clean_tables(y_tables)
+                perm_y = [utils.perm_matrix(yt) for yt in y_cleaned]
+                x_cleaned = self._clean_tables(x_tables)
+                perm_x = [utils.perm_matrix(xt) for xt in x_cleaned]
 
-                perm_svd = self.mult_plsc(perm_y, perm_x_tables)
+                perm_svd = self.mult_plsc(perm_y, perm_x)
             except np.linalg.LinAlgError:
                 continue #Rerun permutation if SVD doesn't converge
 
@@ -237,7 +243,7 @@ class MultitablePLSC(object):
 
         return output
 
-    def mult_plsc_bootstrap_saliences(self, y_table, x_tables, z_tester=2):
+    def mult_plsc_bootstrap_saliences(self, y_tables, x_tables, z_tester=2):
         """Run bootstrap testing on saliences
 
         Parameters:
@@ -260,24 +266,27 @@ class MultitablePLSC(object):
         if not self.n_iters:
             raise AttributeError("Number of iterations cannot be None")
 
-        true_svd = self.mult_plsc(y_table, x_tables)
-        true_ysal = true_svd[2] #saliences for y-table
-        true_xsal = true_svd[0] #saliences for x-tables
+        true_svd = self.mult_plsc(y_tables, x_tables)
+        true_y_saliences = true_svd[2] #saliences for y-table
+        true_x_saliences = true_svd[0] #saliences for x-tables
 
-        perm_ysal = np.ndarray(shape=[true_ysal.shape[0],
-                                      true_ysal.shape[1],
-                                      self.n_iters])
-        perm_xsal = np.ndarray(shape=[true_xsal.shape[0],
-                                      true_xsal.shape[1],
-                                      self.n_iters])
+        perm_y_saliences = np.ndarray(shape=[true_y_saliences.shape[0],
+                                             true_y_saliences.shape[1],
+                                             self.n_iters])
+        perm_x_saliences = np.ndarray(shape=[true_x_saliences.shape[0],
+                                             true_x_saliences.shape[1],
+                                             self.n_iters])
 
         n = 0
         while n != self.n_iters:
             try:
-                resampled_y = utils.resample_matrix(y_table)
-                resampled_x_tables = [utils.resample_matrix(x) for x in x_tables]
+                y_cleaned = self._clean_tables(y_tables)
+                resampled_y = [utils.resample_matrix(y) for y in y_cleaned]
+                
+                x_cleaned = self._clean_tables(x_tables)
+                resampled_x = [utils.resample_matrix(x) for x in x_cleaned]
 
-                resampled_svd = self.mult_plsc(resampled_y, resampled_x_tables)
+                resampled_svd = self.mult_plsc(resampled_y, resampled_x)
             except np.linalg.LinAlgError:
                 continue #Rerun permutation if SVD doesn't converge
 
@@ -287,29 +296,27 @@ class MultitablePLSC(object):
             except OverflowError:
                 continue #Rerun permutation if overflow
 
-            perm_ysal[:, :, n] = rotated_svd[2]
-            perm_xsal[:, :, n] = rotated_svd[0]
+            perm_y_saliences[:, :, n] = rotated_svd[2]
+            perm_x_saliences[:, :, n] = rotated_svd[0]
             n += 1
 
-        filt_ysal, yz = self._bootstrap_z(true_ysal, perm_ysal, z_tester)
-        filt_xsal, xz = self._bootstrap_z(true_xsal, perm_xsal, z_tester)
+        threshold_y_saliences, y_zscores = self._bootstrap_z(true_y_saliences,
+                                                             perm_y_saliences,
+                                                             z_tester)
+        threshold_x_saliences, x_zscores = self._bootstrap_z(true_x_saliences,
+                                                             perm_x_saliences,
+                                                             z_tester)
 
-        output = {'y_saliences' : filt_ysal,
-                  'x_saliences' : filt_xsal}
+        output = {'y_saliences' : threshold_y_saliences,
+                  'x_saliences' : threshold_x_saliences}
+        
         if self.return_perm:
-            output['zscores_y_saliences'] = yz
-            output['zscores_x_saliences'] = xz
-            output['permcube_y_saliences'] = perm_ysal
-            output['permcube_x_saliences'] = perm_xsal
+            output['zscores_y_saliences'] = y_zscores
+            output['zscores_x_saliences'] = x_zscores
+            output['permcube_y_saliences'] = perm_y_saliences
+            output['permcube_x_saliences'] = perm_x_saliences
 
         return output
 
 if __name__ == "__main__":
-    print('Test')
-    y = np.loadtxt('y_table.txt')
-    x_list = [np.loadtxt('x_table_%d.txt' % (x+1)) for x in range(3)]
-
-    p = MultitablePLSC(n_iters=1000)
-
-    res_permeigs = p.mult_plsc_eigenperm(y, x_list)
-    res_boostrap = p.mult_plsc_bootstrap_saliences(y, x_list)
+    pass

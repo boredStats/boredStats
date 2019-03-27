@@ -179,10 +179,8 @@ class MultitablePLSC(object):
                         raise RuntimeError("Tables need same number of subjects")
             
             corr_xy = cross_corr(np.hstack(x), np.hstack(y))
-        
-        centered_corr_xy = utils.center_matrix(corr_xy)
 
-        u, delta, v = np.linalg.svd(centered_corr_xy, full_matrices=False)
+        u, delta, v = np.linalg.svd(corr_xy, full_matrices=False)
         return u, delta, v
 
     def mult_plsc_eigenperm(self, y_tables, x_tables):

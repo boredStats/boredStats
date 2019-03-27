@@ -19,6 +19,17 @@ def center_matrix(a):
 #    return np.subtract(a, rep_mean)
     return a - np.mean(a, axis=0)
 
+def scale_matrix(a):
+    """
+    Convert centered data to z-scores
+    """
+    std = np.std(a, axis=0)
+    b = np.ndarray(shape=a.shape)
+    for c in range(a.shape[1]):
+        b[:, c] = np.divide(a[:, c], std[c])
+         
+    return b
+
 def perm_matrix(matrix):
     """
     Permute the columns of a matrix using as little memory as possible

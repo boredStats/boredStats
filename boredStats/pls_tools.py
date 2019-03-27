@@ -20,10 +20,7 @@ import numpy as np
 import pandas as pd
 
 class MultitablePLSC(object):
-    def __init__(self, center=True, scale=False,
-                 n_iters=None, return_perm=False):
-        self.center = center
-        self.scale = scale
+    def __init__(self, n_iters=None, return_perm=False):
         self.n_iters = n_iters
         self.return_perm = return_perm
 
@@ -183,12 +180,9 @@ class MultitablePLSC(object):
             
             corr_xy = cross_corr(np.hstack(x), np.hstack(y))
         
-        if self.center:
-            corr_xy = utils.center_matrix(corr_xy)
-        if self.scale:
-            corr_xy = utils.scale_matrix(corr_xy)
-        
-        u, delta, v = np.linalg.svd(corr_xy, full_matrices=False)
+        centered_corr_xy = utils.center_matrix(corr_xy)
+
+        u, delta, v = np.linalg.svd(centered_corr_xy, full_matrices=False)
         return u, delta, v
 
     def mult_plsc_eigenperm(self, y_tables, x_tables):

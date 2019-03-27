@@ -14,6 +14,7 @@ requires a list of arrays
 """
 
 from . import utils
+from .corr_tools import cross_corr
 
 import numpy as np
 import pandas as pd
@@ -27,7 +28,7 @@ class MultitablePLSC(object):
         self.return_perm = return_perm
 
     @staticmethod
-    def _clean_tables(table, center, scale):
+    def _clean_tables(table):
         #Check input type, return as list of numpy arrays
         outlist = []
         if isinstance(table, list):
@@ -44,14 +45,7 @@ class MultitablePLSC(object):
         if isinstance(table, pd.DataFrame):
             outlist.append(table.values)
         
-        cleaned = []
-        for table in outlist:
-            if center:
-                table = utils.center_matrix(table)
-            if scale:
-                table = utils.scale_matrix(table)
-            cleaned.append(table)
-        return cleaned
+        return outlist
     
     @staticmethod
     def _procrustes_rotation(orig_svd, resamp_svd):
@@ -180,14 +174,19 @@ class MultitablePLSC(object):
         """
         
         if corr_xy is None:
-            x = self._clean_tables(x_tables, self.center, self.scale)
-            y = self._clean_tables(y_tables, self.center, self.scale)
+            x = self._clean_tables(x_tables)
+            y = self._clean_tables(y_tables)
             for yt in y:
                 for xt in x:
                     if yt.shape[0] != xt.shape[0]:
                         raise RuntimeError("Tables need same number of subjects")
             
-            corr_xy = np.dot(np.hstack(x).T, np.hstack(y))
+            corr_xy = cross_corr(np.hstack(x), np.hstack(y))
+        
+        if self.center:
+            corr_xy = utils.center_matrix(corr_xy)
+        if self.scale:
+            corr_xy = utils.scale_matrix(corr_xy)
         
         u, delta, v = np.linalg.svd(corr_xy, full_matrices=False)
         return u, delta, v

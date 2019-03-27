@@ -9,7 +9,7 @@ from . import utils
 
 import numpy as np
 
-def cross_corr(x, y, centered=False):
+def cross_corr(x, y):
     """
     Calculate Pearson's R the columns of two matrices
     """
@@ -19,10 +19,9 @@ def cross_corr(x, y, centered=False):
     
     std_x = x.std(0, ddof=s - 1)
     std_y = y.std(0, ddof=s - 1)
-    if centered is False:
-        cov = np.dot(utils.center_matrix(x).T, utils.center_matrix(y))
-    else:
-        cov = np.dot(x.T, y)
+    
+    cov = np.dot(utils.center_matrix(x).T, utils.center_matrix(y))
+    
     return cov/np.dot(std_x[:, np.newaxis], std_y[np.newaxis, :])
 
 def r_to_p(rmat, n):

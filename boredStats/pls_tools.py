@@ -20,10 +20,10 @@ import numpy as np
 import pandas as pd
 
 class MultitablePLSC(object):
-    def __init__(self, n_latent_variables='all',
-                 n_iters=1000, return_perm=False):
+    def __init__(self, n_latent_variables='all', n_iters=1000, alpha=.05, return_perm=False):
         self.n_latent_vars = n_latent_variables
         self.n_iters = n_iters
+        self.alpha = alpha
         self.return_perm = return_perm
 
     @staticmethod

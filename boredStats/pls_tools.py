@@ -20,7 +20,9 @@ import numpy as np
 import pandas as pd
 
 class MultitablePLSC(object):
-    def __init__(self, n_iters=None, return_perm=False):
+    def __init__(self, n_latent_variables='all',
+                 n_iters=1000, return_perm=False):
+        self.n_latent_vars = n_latent_variables
         self.n_iters = n_iters
         self.return_perm = return_perm
 
@@ -157,7 +159,7 @@ class MultitablePLSC(object):
 
     def mult_plsc(self, y_tables=None, x_tables=None, corr_xy=None):
         """Calculate multitable PLS-C, fixed effect model
-
+        
         Parameters
         ----------
         y_tables: numpy array, pandas dataframe, or list either
@@ -181,8 +183,14 @@ class MultitablePLSC(object):
             corr_xy = cross_corr(np.hstack(x), np.hstack(y))
 
         u, delta, v = np.linalg.svd(corr_xy, full_matrices=False)
-        return u, delta, v
-
+        if self.n_latent_vars == 'all':    
+            return u, delta, v
+        else: #TO-DO: make n_latent_vars work with perm,boot
+            u_filt = u[:, :self.n_latent_vars]
+            delta_filt = delta[:self.n_latent_vars]
+            v_filt = v[:self.n_latent_vars, :]
+            return u_filt, delta_filt, v_filt
+        
     def mult_plsc_eigenperm(self, y_tables, x_tables):
         """Run permutation based testing to determine
         best number of latent variables to use
@@ -306,11 +314,11 @@ class MultitablePLSC(object):
                                                              z_tester)
 
         output = {'y_saliences' : threshold_y_saliences,
-                  'x_saliences' : threshold_x_saliences}
+                  'x_saliences' : threshold_x_saliences,
+                  'zscores_y_saliences' : y_zscores,
+                  'zscores_x_saliences' : x_zscores}
         
         if self.return_perm:
-            output['zscores_y_saliences'] = y_zscores
-            output['zscores_x_saliences'] = x_zscores
             output['permcube_y_saliences'] = perm_y_saliences
             output['permcube_x_saliences'] = perm_x_saliences
 

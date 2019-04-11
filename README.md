@@ -2,10 +2,11 @@
 
 Tools for data mining and Monte Carlo simulation-based inferential statistics. 
 
-Pandas dataframes are currently not supported.
+Pandas dataframes are partially supported for now.
 
 ### _Requirements_
 - numpy
+- pandas
 
 Implemented:
 - Multi-table PLS-correlation

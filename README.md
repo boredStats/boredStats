@@ -9,12 +9,12 @@ Pandas dataframes are currently not supported.
 
 Implemented:
 - Multi-table PLS-correlation
+- PCA - permutation testing for eigenvalues, bootstrap testing for loadings (needs to be cleaned up for readability)
 
 In progress:
-- PCA - permutation testing for eigenvalues, bootstrap testing for loadings
+- Pandas dataframes support - basic implementation so far, working on returning loadings in dataframes
+- pypi distribution - package is currently uploaded to pypi, but is not guaranteed to be current with this repo
 
 Planned:
 - Multi-table PLS-regression
 - Correspondence Analysis/Multiple Correspondence Analysis + inferential stats
-- Support for pandas
-- pypi distribution

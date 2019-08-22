@@ -8,22 +8,45 @@ Created on Thu Mar  7 10:37:27 2019
 import numpy as np
 import pandas as pd
 from scipy.sparse import issparse
-#from statsmodels.stats import multitest as mt
 from sklearn.utils import resample as sk_resample
 from sklearn.utils import safe_indexing
 from sklearn.utils.validation import check_consistent_length
 from copy import deepcopy
 
 
-def center_matrix(a):
+def center_scale_array(x, scale='Z'):
+    """Center and/or scale an array
+
+    Parameters
+    ----------
+    x : array to center/scale
+
+    scale : {None, 'Z', 'SS1'}, default is 'z'
+        Parameter to specifcy scaling method. Use None if you only want to remove the column means
+        from the data. Use 'Z' if you want to scale your columns by their standard deviations. Use
+        'SS1' if you want to scale your columns so that their sum of squares will equal 1 (See
+        Abdi & Williams, 2010).
+
+    Returns
+    -------
+    cleaned : cleaned array
     """
-    Remove the means from each column in a matrix
-    """
-#    col_means = a.mean(0)
-#    rep_mean = np.reshape(np.repeat(col_means, a.shape[0]), a.shape, order="F")
-#    
-#    return np.subtract(a, rep_mean)
-    return a - np.mean(a, axis=0)
+    # Centering data
+    cleaned = deepcopy(x).astype(float)
+    cleaned_mean = cleaned.mean(axis=0)
+    cleaned -= cleaned_mean
+
+    if scale is 'Z':
+        cleaned_std = cleaned.std(axis=0, ddof=1)
+        cleaned_std[cleaned_std == 0.0] = 1.0
+        cleaned /= cleaned_std
+
+    elif scale is 'SS1':
+        ss = np.sum(cleaned ** 2, axis=0)
+        sqrt_ss = np.sqrt(ss)
+        cleaned /= sqrt_ss
+
+    return cleaned
 
 
 def resample_array(*arrays_to_shuffle, **options):
@@ -112,49 +135,24 @@ def resample_array(*arrays_to_shuffle, **options):
     else:
         return resamp_arrays
 
-#def fdr_pmatrix(p_matrix):
-#    """
-#    Apply a FDR correction to a matrix of p-values
-#    """
-#    pvect = np.ndarray.flatten(p_matrix)
-#    _, fdr_p = mt.fdrcorrection(pvect)
-#    return np.reshape(fdr_p, p_matrix.shape)
 
 def permutation_p(observed, perm_array):
-    #see Phipson & Smyth 2010 for more information
+    """Non-parametric null hypothesis testing
+
+    see Phipson & Smyth 2010 for more information
+    """
     n_iters = len(perm_array)
     n_hits = np.where(np.abs(perm_array) >= np.abs(observed))
     return (len(n_hits[0]) + 1) / (n_iters + 1)
 
-def resample_matrix(matrix):
-    """
-    Columnwise resampling with replacement
-    """        
-    n_rows = matrix.shape[0]
-    n_cols = matrix.shape[1]
-    
-    resamp_mat = np.ndarray(shape=matrix.shape)
-    for col in range(n_cols):
-        for row in range(n_rows):
-            idx = np.random.randint(0, n_rows)
-            resamp_mat[row, col] = matrix[idx, col]
-    
-    return resamp_mat
 
-
-def performance_testing():
+if __name__ == "__main__":
+    # Performance testing
+    
     seed = 2
-    # test_data = np.ndarray(shape=(20, 1))
     test_data = np.array([[1, 2, 3, 4], [4, 5, 6, 7], [7, 8, 9, 10], [10, 11, 12, 13], [13, 14, 15, 16]])
     print(test_data)
 
-    # perm_data = resample_array(test_data, shuffler='indep', seed=None)
-    # print(perm_data)
+    cleaned_test_data = center_scale_array(test_data, scale='SS1')
+    print(cleaned_test_data)
 
-    # perm_data = sk_resample(test_data, replace=False, random_state=11)
-    # print(perm_data)
-
-    perm_data = resample_array(test_data, test_data, shuffler='indep', bootstrap=True)
-    print(perm_data)
-
-test = performance_testing()

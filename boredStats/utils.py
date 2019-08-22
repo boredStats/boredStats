@@ -7,8 +7,7 @@ Created on Thu Mar  7 10:37:27 2019
 
 import numpy as np
 import pandas as pd
-from scipy.sparse import issparse, csc_matrix
-from numpy.random import permutation as pf
+from scipy.sparse import issparse
 #from statsmodels.stats import multitest as mt
 from sklearn.utils import resample as sk_resample
 from sklearn.utils import safe_indexing
@@ -40,16 +39,33 @@ def resample_array(*arrays_to_shuffle, **options):
     bootstrap : bool, default is False
         Parameter to specify resampling method. If False (default), Resample the array
         without replacement (for permutation-based testing). If True, resample with
-        replacement (for bootstrap testing).
+        replacement (for bootstrap testing). This parameter changes behavior of the
+        shuffler parameter (see below).
 
     shuffler : {'indep', 'together'}, default is 'indep'
-        Parameter to specify shuffling method
+        Parameter to specify shuffling method. Depending on whether or not bootstrap is set
+        to True, this function will behave differently, especially if more than one array
+        is provided.
+
+        When bootstrap == False:
             - 'indep':  For each column, shuffle the rows and add to the resampled array.
             Depending on the array size, this method may be extremely memory-intensive,
             though the correlational structure of the array is more likely to be destroyed.
 
             - 'together': The rows of the array are shuffled. This is the fastest and most
             memory-friendly method. However, correlations between columns may be preserved.
+
+        When bootstrap == True and number of arrays > 1:
+            - 'indep': For each array, resample the data using the bootstrap procedure
+            independently. The subjects chosen for one resampled array will not necessarily
+            be the same set of subjects for subsequent resampled arrays.
+
+            - 'together': Apply the bootstrap resampling procedure to all arrays. A set of
+            subjects will be chosen for the resampling procedure, and then their data will
+            be sampled from all arrays. The bootstrap estimates may be slightly different
+            than if the arrays are resampled independently.
+
+            If a single arrays is provided, shuffler will be ignored.
 
     seed : {int or None}
         Parameter to set the RNG seed. If None, seed is automatically chosen.
@@ -64,6 +80,7 @@ def resample_array(*arrays_to_shuffle, **options):
 
     rand_state = np.random.RandomState(seed)
     check_consistent_length(*arrays_to_shuffle)
+    n_subjects = arrays_to_shuffle[0].shape[0]
 
     def _independent_shuffling(array_to_shuffle):
         n_rows, n_cols = array_to_shuffle.shape[0], array_to_shuffle.shape[1]
@@ -82,11 +99,13 @@ def resample_array(*arrays_to_shuffle, **options):
         elif shuffler is 'together':
             resamp_arrays = [sk_resample(a, replace=False, random_state=rand_state) for a in arrays_to_shuffle]
 
-        else:
-            raise ValueError('%s is not a recognized parameter for shuffler' % str(shuffler))
     else:
-        print('boot')
-        resamp_arrays = sk_resample(arrays_to_shuffle, replace=True, random_state=rand_state)
+        if len(arrays_to_shuffle) == 1 or shuffler is 'indep':
+            resamp_arrays = [sk_resample(a, replace=True, random_state=rand_state) for a in arrays_to_shuffle]
+        elif shuffler is 'together':
+            arrays_to_shuffle = [a.tolil() if issparse(a) else a for a in arrays_to_shuffle]
+            boot_indices = rand_state.randint(0, n_subjects, size=n_subjects)
+            resamp_arrays = [safe_indexing(a, boot_indices) for a in arrays_to_shuffle]
 
     if len(resamp_arrays) == 1:
         return resamp_arrays[0]
@@ -132,10 +151,10 @@ def performance_testing():
     # perm_data = resample_array(test_data, shuffler='indep', seed=None)
     # print(perm_data)
 
-    perm_data = sk_resample(test_data, replace=False, random_state=11)
-    print(perm_data)
+    # perm_data = sk_resample(test_data, replace=False, random_state=11)
+    # print(perm_data)
 
-    perm_data = resample_array(test_data, shuffler='together', seed=11)
+    perm_data = resample_array(test_data, test_data, shuffler='indep', bootstrap=True)
     print(perm_data)
 
 test = performance_testing()

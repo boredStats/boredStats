@@ -6,8 +6,15 @@ Created on Thu Mar  7 10:37:27 2019
 """
 
 import numpy as np
+import pandas as pd
+from scipy.sparse import issparse, csc_matrix
 from numpy.random import permutation as pf
 #from statsmodels.stats import multitest as mt
+from sklearn.utils import resample as sk_resample
+from sklearn.utils import safe_indexing
+from sklearn.utils.validation import check_consistent_length
+from copy import deepcopy
+
 
 def center_matrix(a):
     """
@@ -19,11 +26,72 @@ def center_matrix(a):
 #    return np.subtract(a, rep_mean)
     return a - np.mean(a, axis=0)
 
-def perm_matrix(matrix):
+
+def resample_array(*arrays_to_shuffle, **options):
+    """Resample an array or arrays
+
+    Parameters
+    ----------
+    *arrays_to_shuffle : array or sequence of arrays
+        If multiple arrays are provided, they must have the same number of rows
+
+    Other parameters
+    ----------------
+    bootstrap : bool, default is False
+        Parameter to specify resampling method. If False (default), Resample the array
+        without replacement (for permutation-based testing). If True, resample with
+        replacement (for bootstrap testing).
+
+    shuffler : {'indep', 'together'}, default is 'indep'
+        Parameter to specify shuffling method
+            - 'indep':  For each column, shuffle the rows and add to the resampled array.
+            Depending on the array size, this method may be extremely memory-intensive,
+            though the correlational structure of the array is more likely to be destroyed.
+
+            - 'together': The rows of the array are shuffled. This is the fastest and most
+            memory-friendly method. However, correlations between columns may be preserved.
+
+    seed : {int or None}
+        Parameter to set the RNG seed. If None, seed is automatically chosen.
+
+    Returns
+    -------
+    resamp_array (numpy array): an (N x M) resampled array
     """
-    Permute the columns of a matrix using as little memory as possible
-    """
-    return np.asarray([pf(matrix[:, col]) for col in range(matrix.shape[1])]).T
+    seed = options.pop('seed', None)
+    bootstrap = options.pop('bootstrap', False)
+    shuffler = options.pop('shuffler', 'indep')
+
+    rand_state = np.random.RandomState(seed)
+    check_consistent_length(*arrays_to_shuffle)
+
+    def _independent_shuffling(array_to_shuffle):
+        n_rows, n_cols = array_to_shuffle.shape[0], array_to_shuffle.shape[1]
+        shuffled_array = deepcopy(array_to_shuffle)
+        for c in range(n_cols):
+            perm_indices = np.arange(n_rows)
+            rand_state.shuffle(perm_indices)
+            shuffled_array[:, c] = safe_indexing(array_to_shuffle[:, c], perm_indices)
+        return shuffled_array
+
+    if bootstrap is False:
+        if shuffler is 'indep':
+            arrays_to_shuffle = [a.tolil() if issparse(a) else a for a in arrays_to_shuffle]
+            resamp_arrays = [_independent_shuffling(a) for a in arrays_to_shuffle]
+
+        elif shuffler is 'together':
+            resamp_arrays = [sk_resample(a, replace=False, random_state=rand_state) for a in arrays_to_shuffle]
+
+        else:
+            raise ValueError('%s is not a recognized parameter for shuffler' % str(shuffler))
+    else:
+        print('boot')
+        resamp_arrays = sk_resample(arrays_to_shuffle, replace=True, random_state=rand_state)
+
+    if len(resamp_arrays) == 1:
+        return resamp_arrays[0]
+    else:
+        return resamp_arrays
 
 #def fdr_pmatrix(p_matrix):
 #    """
@@ -53,3 +121,21 @@ def resample_matrix(matrix):
             resamp_mat[row, col] = matrix[idx, col]
     
     return resamp_mat
+
+
+def performance_testing():
+    seed = 2
+    # test_data = np.ndarray(shape=(20, 1))
+    test_data = np.array([[1, 2, 3, 4], [4, 5, 6, 7], [7, 8, 9, 10], [10, 11, 12, 13], [13, 14, 15, 16]])
+    print(test_data)
+
+    # perm_data = resample_array(test_data, shuffler='indep', seed=None)
+    # print(perm_data)
+
+    perm_data = sk_resample(test_data, replace=False, random_state=11)
+    print(perm_data)
+
+    perm_data = resample_array(test_data, shuffler='together', seed=11)
+    print(perm_data)
+
+test = performance_testing()

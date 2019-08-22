@@ -1,10 +1,3 @@
-# -*- coding: utf-8 -*-
-"""
-Common functions
-
-Created on Thu Mar  7 10:37:27 2019
-"""
-
 import numpy as np
 import pandas as pd
 from scipy.sparse import issparse
@@ -148,7 +141,7 @@ def permutation_p(observed, perm_array):
 
 if __name__ == "__main__":
     # Performance testing
-    
+
     seed = 2
     test_data = np.array([[1, 2, 3, 4], [4, 5, 6, 7], [7, 8, 9, 10], [10, 11, 12, 13], [13, 14, 15, 16]])
     print(test_data)

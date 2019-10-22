@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 """Tools for correlation analyses."""
 
+from scipy.stats import t as tfunc
 from .utils import center_scale_array
 
 import numpy as np
@@ -21,10 +22,15 @@ def quick_corr(x, y=None):
     ----------
     x : numpy array or pandas DataFrame
         If only x is given, this function will calculate the pairwise
-        correlations of the columns in the matrix
+        correlations of the columns in the matrix.
 
     y : numpy array or pandas DataFrame, optional
-        The second dataset to correlate with the variables in x
+        The second dataset to correlate with the variables in x.
+
+    Returns
+    -------
+    rmat : numpy array
+        The array of correlation coefficients.
 
     """
     if y is None:
@@ -41,18 +47,38 @@ def quick_corr(x, y=None):
         center_scale_array(x, scale=None).T,
         center_scale_array(y, scale=None))
 
-    return cov/np.dot(std_x[:, np.newaxis], std_y[np.newaxis, :])
+    rmat = cov/np.dot(std_x[:, np.newaxis], std_y[np.newaxis, :])
+    return rmat
 
 
-def r_to_p(rmat, n):
+def p_from_pearsonr(rmat, n, return_se=False):
+    """Get the associated p-values for a linear correlation coef matrix.
+
+    The parametric method for calculating p-values. As the input is assumed to
+    be Pearson's R, p-values are calculated from the t-distribution.
+
+    Warning: do not use this function to calculate p-values if the input is not
+    Pearson's R. If unsure, just calculate p using the non-parametric methods.
+
+    Parameters
+    ----------
+    rmat : numpy array or pandas DataFrame
+        The correlation coefficient matrix over which to calculate p-values.
+
+    n : int
+        The number of subjects that were used to calculate each coefficient in
+        rmat.
+
+    return_se : bool, optional
+        Whether or not to return the standard errors of rmat.
+
+    Returns
+    -------
+    p_values : numpy array
+        Array of p-values with shape of rmat.shape, where each p-value
+        corresponds to the associated coefficient in rmat.
+
     """
-    Get the associated p-values for a correlation matrix
-
-    Parametric method for calculating p-values:
-        Input is assumed to be Pearson's R
-        Hence p-values are calculated from the t-distribution
-    """
-    from scipy.stats import t as tfunc
     denmat = (1 - rmat**2) / (n - 2)
     tmat = rmat / np.sqrt(denmat)
 
@@ -61,15 +87,14 @@ def r_to_p(rmat, n):
     for ti, tval in enumerate(tvect):
         pvect[ti] = tfunc.sf(np.abs(tval), n-1) * 2
 
-    return np.reshape(pvect, rmat.shape)
+    p_values = np.reshape(pvect, rmat.shape)
 
+    if return_se:
+        standard_errors = (1 - rmat**2) / (n - 2)
+    else:
+        standard_errors = None
 
-def r_to_se(rmat, n):
-    """
-    Get the associated standard errors for a correlation matrix
-    """
-    a = (1 - rmat**2) / (n - 2)
-    return np.sqrt(a)
+    return p_values, standard_errors
 
 
 class PermutationCorrelation(object):

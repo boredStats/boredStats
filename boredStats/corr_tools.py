@@ -1,27 +1,45 @@
 # -*- coding: utf-8 -*-
-"""
-Tools for correlation matrices
+"""Tools for correlation analyses."""
 
-Created on Wed Mar  6 14:18:19 2019
-"""
-
-from . import utils
+from .utils import center_scale_array
 
 import numpy as np
 
 
-def cross_corr(x, y):
-    """
-    Calculate Pearson's R the columns of two matrices
-    """
-    s = x.shape[0]
-    if s != y.shape[0]:
-        raise ValueError ("x and y must have the same number of subjects")
+def quick_corr(x, y=None):
+    """Rapid calculation of the linear correlation coefficient.
 
-    std_x = x.std(0, ddof=s - 1)
-    std_y = y.std(0, ddof=s - 1)
+    This function calculates the linear correlation coefficient for each pair
+    of variables in x and y. Data is assumed to be organized such that:
+        rows = subjects
+        columns = variables
 
-    cov = np.dot(utils.center_matrix(x).T, utils.center_matrix(y))
+    Note: performance may vary depending on the size of the arrays. Not
+    recommended for very large arrays.
+
+    Parameters
+    ----------
+    x : numpy array or pandas DataFrame
+        If only x is given, this function will calculate the pairwise
+        correlations of the columns in the matrix
+
+    y : numpy array or pandas DataFrame, optional
+        The second dataset to correlate with the variables in x
+
+    """
+    if y is None:
+        y = deepcopy(x)
+
+    n = x.shape[0]
+    if n != y.shape[0]:
+        raise ValueError("x and y must have the same number of observations.")
+
+    std_x = x.std(axis=0, ddof=s - 1)
+    std_y = y.std(axis=0, ddof=s - 1)
+
+    cov = np.dot(
+        center_scale_array(x, scale=None).T,
+        center_scale_array(y, scale=None))
 
     return cov/np.dot(std_x[:, np.newaxis], std_y[np.newaxis, :])
 

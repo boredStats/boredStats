@@ -8,21 +8,26 @@ from copy import deepcopy
 
 
 def center_scale_array(x, scale='Z'):
-    """Center and/or scale an array
+    """Center and/or scale an array.
+
+    Custom function for centering/scaling data. Similiar to other
+    implementations for scale=None and scale='Z'.
 
     Parameters
     ----------
     x : array to center/scale
 
     scale : {None, 'Z', 'SS1'}, default is 'z'
-        Parameter to specifcy scaling method. Use None if you only want to remove the column means
-        from the data. Use 'Z' if you want to scale your columns by their standard deviations. Use
-        'SS1' if you want to scale your columns so that their sum of squares will equal 1 (See
+        Parameter to specifcy scaling method. Use None if you only want to
+        remove the column means from the data. Use 'Z' if you want to scale
+        your columns by their standard deviations. Use 'SS1' if you want to
+        scale your columns so that their sum of squares will equal 1 (See
         Abdi & Williams, 2010).
 
     Returns
     -------
     cleaned : cleaned array
+
     """
     # Centering data
     cleaned = deepcopy(x).astype(float)
@@ -148,4 +153,3 @@ if __name__ == "__main__":
 
     cleaned_test_data = center_scale_array(test_data, scale='SS1')
     print(cleaned_test_data)
-

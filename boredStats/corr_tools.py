@@ -2,6 +2,7 @@
 """Tools for correlation analyses."""
 
 from scipy.stats import t as tfunc
+from scipy.stats import pearsonr, chi2
 from .utils import center_scale_array
 
 import numpy as np
@@ -95,6 +96,30 @@ def p_from_pearsonr(rmat, n, return_se=False):
         standard_errors = None
 
     return p_values, standard_errors
+
+
+def circular_linear_correlation(angle, line):
+    """Circular-linear correlation function.
+
+    Correlate periodic data with linear data.
+
+    """
+    n = len(angle)
+
+    corr_sin_x, _ = pearsonr(line, np.sin(angle))
+    corr_cos_x, _ = pearsonr(line, np.cos(angle))
+    corr_angles, _ = pearsonr(np.sin(angle), np.cos(angle))
+
+    a = corr_cos_x**2 + corr_sin_x**2
+    b = 2*corr_cos_x*corr_sin_x*corr_angles
+    c = 1 - corr_angles**2
+    rho = np.sqrt((a - b) / c)
+
+    r_2 = rho**2
+    p = 1 - chi2.cdf(n * (rho ** 2), 1)
+    se = np.sqrt((1-r_2)/(n-2))
+
+    return rho, p, r_2, se
 
 
 class PermutationCorrelation(object):

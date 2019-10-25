@@ -144,12 +144,29 @@ def permutation_p(observed, perm_array):
     return (len(n_hits[0]) + 1) / (n_iters + 1)
 
 
+def upper_tri_indexing(A, diagonal=False):
+    # Return upper trianlge of matrix without the diagonal
+    m = A.shape[0]
+    if diagonal is False:
+        d = 1
+    elif diagonal is True:
+        d = 0
+    r, c = np.triu_indices(m, d)
+    return A[r, c]
+
+
 if __name__ == "__main__":
     # Performance testing
 
-    seed = 2
-    test_data = np.array([[1, 2, 3, 4], [4, 5, 6, 7], [7, 8, 9, 10], [10, 11, 12, 13], [13, 14, 15, 16]])
-    print(test_data)
+    # seed = 2
+    # test_data = np.array([[1, 2, 3, 4], [4, 5, 6, 7], [7, 8, 9, 10], [10, 11, 12, 13], [13, 14, 15, 16]])
+    # print(test_data)
+    #
+    # cleaned_test_data = center_scale_array(test_data, scale='SS1')
+    # print(cleaned_test_data)
 
-    cleaned_test_data = center_scale_array(test_data, scale='SS1')
-    print(cleaned_test_data)
+
+    a = np.array([[1, 1, 1], [2, 2, 2], [3, 3, 3]])
+    test = upper_tri_indexing(a)
+    print(a)
+    print(test)
